@@ -16,18 +16,22 @@
 
 package org.springframework.data.mongodb.repository.query
 
-import com.mongodb.util.JSONParseException
 import org.bson.Document
+import org.bson.json.JsonParseException
 import org.springframework.data.mongodb.core.CoroutineMongoOperations
 import org.springframework.data.mongodb.core.query.BasicQuery
 import org.springframework.data.mongodb.core.query.Query
+import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider
 import org.springframework.data.repository.query.parser.PartTree
+import org.springframework.expression.ExpressionParser
 import org.springframework.util.StringUtils
 
 open class CoroutinePartTreeMongoQuery(
-        method: CoroutineMongoQueryMethod,
-        operations: CoroutineMongoOperations
-): AbstractCoroutineMongoQuery(method, operations) {
+    method: CoroutineMongoQueryMethod,
+    operations: CoroutineMongoOperations,
+    expressionParser: ExpressionParser,
+    evaluationContextProvider: QueryMethodEvaluationContextProvider
+): AbstractCoroutineMongoQuery(method, operations, expressionParser, evaluationContextProvider) {
 
     private val processor = method.resultProcessor
     private val tree = PartTree(method.name, processor.returnedType.domainType)
@@ -74,7 +78,7 @@ open class CoroutinePartTreeMongoQuery(
 
             return result
 
-        } catch (o_O: JSONParseException) {
+        } catch (o_O: JsonParseException) {
             throw IllegalStateException(String.format("Invalid query or field specification in %s!", queryMethod),
                     o_O)
         }

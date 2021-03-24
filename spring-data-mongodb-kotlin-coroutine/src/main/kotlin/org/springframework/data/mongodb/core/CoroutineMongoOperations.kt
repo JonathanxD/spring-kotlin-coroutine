@@ -21,6 +21,7 @@ import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.UpdateResult
 import com.mongodb.coroutines.client.CoroutineMongoCollection
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
 import org.bson.Document
 import org.reactivestreams.Subscription
 import org.springframework.data.geo.GeoResult
@@ -90,7 +91,7 @@ interface CoroutineMongoOperations {
      * @param action callback object that specifies the MongoDB actions to perform on the passed in DB instance.
      * @return a result object returned by the action
     </T> */
-    suspend fun <T> execute(action: CoroutineDatabaseCallback<T>): List<T>
+    suspend fun <T: Any> execute(action: CoroutineDatabaseCallback<T>): List<T>
 
     /**
      * Executes the given [CoroutineCollectionCallback] on the entity collection of the specified class.
@@ -103,7 +104,7 @@ interface CoroutineMongoOperations {
      * @param action callback object that specifies the MongoDB action
      * @return a result object returned by the action or <tt>null</tt>
     </T> */
-    suspend fun <T> execute(entityClass: Class<*>, action: CoroutineCollectionCallback<T>): List<T>
+    suspend fun <T: Any> execute(entityClass: Class<*>, action: CoroutineCollectionCallback<T>): List<T>
 
     /**
      * Executes the given [CoroutineCollectionCallback] on the collection of the given name.
@@ -116,7 +117,7 @@ interface CoroutineMongoOperations {
      * @param action callback object that specifies the MongoDB action the callback action.
      * @return a result object returned by the action or <tt>null</tt>
     </T> */
-    suspend fun <T> execute(collectionName: String, action: CoroutineCollectionCallback<T>): List<T>
+    suspend fun <T: Any> execute(collectionName: String, action: CoroutineCollectionCallback<T>): List<T>
 
     /**
      * Create an uncapped collection with a name based on the provided entity class.
@@ -124,7 +125,7 @@ interface CoroutineMongoOperations {
      * @param entityClass class that determines the collection to create
      * @return the created collection
      */
-    suspend fun <T> createCollection(entityClass: Class<T>): CoroutineMongoCollection<Document>
+    suspend fun <T: Any> createCollection(entityClass: Class<T>): CoroutineMongoCollection<Document>
 
     /**
      * Create a collection with a name based on the provided entity class using the options.
@@ -133,7 +134,7 @@ interface CoroutineMongoOperations {
      * @param collectionOptions options to use when creating the collection.
      * @return the created collection
      */
-    suspend fun <T> createCollection(entityClass: Class<T>, collectionOptions: CollectionOptions): CoroutineMongoCollection<Document>
+    suspend fun <T: Any> createCollection(entityClass: Class<T>, collectionOptions: CollectionOptions): CoroutineMongoCollection<Document>
 
     /**
      * Create an uncapped collection with the provided name.
@@ -168,7 +169,7 @@ interface CoroutineMongoOperations {
      * @param collectionName name of the collection
      * @return an existing collection or a newly created one.
      */
-    fun getCollection(collectionName: String): CoroutineMongoCollection<Document>
+    suspend fun getCollection(collectionName: String): CoroutineMongoCollection<Document>
 
     /**
      * Check to see if a collection with a name indicated by the entity class exists.
@@ -179,7 +180,7 @@ interface CoroutineMongoOperations {
      * @param entityClass class that determines the name of the collection
      * @return true if a collection with the given name is found, false otherwise.
      */
-    suspend fun <T> collectionExists(entityClass: Class<T>): Boolean
+    suspend fun <T: Any> collectionExists(entityClass: Class<T>): Boolean
 
     /**
      * Check to see if a collection with a given name exists.
@@ -200,7 +201,7 @@ interface CoroutineMongoOperations {
      *
      * @param entityClass class that determines the collection to drop/delete.
      */
-    suspend fun <T> dropCollection(entityClass: Class<T>)
+    suspend fun <T: Any> dropCollection(entityClass: Class<T>)
 
     /**
      * Drop the collection with the given name.
@@ -226,7 +227,7 @@ interface CoroutineMongoOperations {
      * @param entityClass the parametrized type of the returned [List].
      * @return the converted collection
      */
-    suspend fun <T> findAll(entityClass: Class<T>): List<T>
+    suspend fun <T: Any> findAll(entityClass: Class<T>): List<T>
 
     /**
      * Query for a [List] of objects of type T from the specified collection.
@@ -243,7 +244,7 @@ interface CoroutineMongoOperations {
      * @param collectionName name of the collection to retrieve the objects from
      * @return the converted collection
      */
-    suspend fun <T> findAll(entityClass: Class<T>, collectionName: String): List<T>
+    suspend fun <T: Any> findAll(entityClass: Class<T>, collectionName: String): List<T>
 
     /**
      * Map the results of an ad-hoc query on the collection for the entity class to a single instance of an object of the
@@ -262,7 +263,7 @@ interface CoroutineMongoOperations {
      * @param entityClass the parametrized type of the returned object.
      * @return the converted object
      */
-    suspend fun <T> findOne(query: Query, entityClass: Class<T>): T?
+    suspend fun <T: Any> findOne(query: Query, entityClass: Class<T>): T?
 
     /**
      * Map the results of an ad-hoc query on the specified collection to a single instance of an object of the specified
@@ -282,7 +283,7 @@ interface CoroutineMongoOperations {
      * @param collectionName name of the collection to retrieve the objects from
      * @return the converted object
      */
-    suspend fun <T> findOne(query: Query, entityClass: Class<T>, collectionName: String): T?
+    suspend fun <T: Any> findOne(query: Query, entityClass: Class<T>, collectionName: String): T?
 
     /**
      * Determine result of given [Query] contains at least one element. <br></br>
@@ -1038,7 +1039,7 @@ interface CoroutineMongoOperations {
      * @param entityClass the parametrized type of the returned [ReceiveChannel].
      * @return the [ReceiveChannel] of converted objects
      */
-    fun <T> tail(query: Query, entityClass: Class<T>): ReceiveChannel<T>
+    fun <T: Any> tail(query: Query, entityClass: Class<T>): Flow<T>
 
     /**
      * Map the results of an ad-hoc query on the collection for the entity class to a stream of objects of the specified
@@ -1060,7 +1061,7 @@ interface CoroutineMongoOperations {
      * @param collectionName name of the collection to retrieve the objects from
      * @return the [ReceiveChannel] of converted objects
      */
-    fun <T> tail(query: Query, entityClass: Class<T>, collectionName: String): ReceiveChannel<T>
+    fun <T: Any> tail(query: Query, entityClass: Class<T>, collectionName: String): Flow<T>
 
     /**
      * Returns the underlying [MongoConverter].
@@ -1693,7 +1694,7 @@ suspend inline fun <reified T: Any> CoroutineMongoOperations.findAllAndRemove(qu
  * @param T the parametrized type of the returned [ReceiveChannel].
  * @return the [ReceiveChannel] of converted objects
  */
-inline fun <reified T: Any> CoroutineMongoOperations.tail(query: Query): ReceiveChannel<T> =
+inline fun <reified T: Any> CoroutineMongoOperations.tail(query: Query): Flow<T> =
     tail(query, T::class.java)
 
 /**
@@ -1716,5 +1717,5 @@ inline fun <reified T: Any> CoroutineMongoOperations.tail(query: Query): Receive
  * @param collectionName name of the collection to retrieve the objects from
  * @return the [ReceiveChannel] of converted objects
  */
-inline fun <reified T: Any> CoroutineMongoOperations.tail(query: Query, collectionName: String): ReceiveChannel<T> =
+inline fun <reified T: Any> CoroutineMongoOperations.tail(query: Query, collectionName: String): Flow<T> =
     tail(query, T::class.java, collectionName)

@@ -20,19 +20,16 @@ import org.springframework.data.mapping.context.MappingContext
 import org.springframework.data.mongodb.core.CoroutineMongoOperations
 import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty
-import org.springframework.data.mongodb.repository.query.CoroutineMongoQueryMethod
-import org.springframework.data.mongodb.repository.query.CoroutinePartTreeMongoQuery
-import org.springframework.data.mongodb.repository.query.CoroutineStringBasedMongoQuery
-import org.springframework.data.mongodb.repository.query.MongoEntityInformation
-import org.springframework.data.mongodb.repository.query.PartTreeMongoQuery
+import org.springframework.data.mongodb.repository.query.*
 import org.springframework.data.projection.ProjectionFactory
 import org.springframework.data.repository.core.NamedQueries
 import org.springframework.data.repository.core.RepositoryInformation
 import org.springframework.data.repository.core.RepositoryMetadata
 import org.springframework.data.repository.core.support.MethodInvocationValidator
-import org.springframework.data.repository.query.EvaluationContextProvider
 import org.springframework.data.repository.query.QueryLookupStrategy
+import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider
 import org.springframework.data.repository.query.RepositoryQuery
+import org.springframework.expression.ExpressionParser
 import org.springframework.expression.spel.standard.SpelExpressionParser
 import java.io.Serializable
 import java.lang.reflect.Method
@@ -74,7 +71,7 @@ open class CoroutineMongoRepositoryFactory(
 	 * @see org.springframework.data.repository.core.support.RepositoryFactorySupport#getQueryLookupStrategy(org.springframework.data.repository.query.QueryLookupStrategy.Key, org.springframework.data.repository.query.EvaluationContextProvider)
 	 */
     override fun getQueryLookupStrategy(key: QueryLookupStrategy.Key,
-                                        evaluationContextProvider: EvaluationContextProvider): Optional<QueryLookupStrategy> =
+                                        evaluationContextProvider: QueryMethodEvaluationContextProvider): Optional<QueryLookupStrategy> =
         Optional.of(MongoQueryLookupStrategy(operations, evaluationContextProvider, mappingContext))
 
     /*
@@ -100,29 +97,41 @@ open class CoroutineMongoRepositoryFactory(
      * @author Mark Paluch
      */
     private class MongoQueryLookupStrategy(
-            private val operations: CoroutineMongoOperations,
-            private val evaluationContextProvider: EvaluationContextProvider,
-            private val mappingContext: MappingContext<out MongoPersistentEntity<*>, MongoPersistentProperty>
+        private val operations: CoroutineMongoOperations,
+        private val evaluationContextProvider: QueryMethodEvaluationContextProvider,
+        private val mappingContext: MappingContext<out MongoPersistentEntity<*>?, MongoPersistentProperty>
     ) : QueryLookupStrategy {
+        private val expressionParser: ExpressionParser =
+            CachingExpressionParser(SpelExpressionParser())
 
         /*
 		 * (non-Javadoc)
 		 * @see org.springframework.data.repository.query.QueryLookupStrategy#resolveQuery(java.lang.reflect.Method, org.springframework.data.repository.core.RepositoryMetadata, org.springframework.data.projection.ProjectionFactory, org.springframework.data.repository.core.NamedQueries)
 		 */
-        override fun resolveQuery(method: Method, metadata: RepositoryMetadata, factory: ProjectionFactory,
-                                  namedQueries: NamedQueries): RepositoryQuery {
-
+        override fun resolveQuery(
+            method: Method, metadata: RepositoryMetadata, factory: ProjectionFactory,
+            namedQueries: NamedQueries
+        ): RepositoryQuery {
             val queryMethod = CoroutineMongoQueryMethod(method, metadata, factory, mappingContext)
             val namedQueryName = queryMethod.namedQueryName
-
-            if (namedQueries.hasQuery(namedQueryName)) {
-                val namedQuery = namedQueries.getQuery(namedQueryName)
-                return CoroutineStringBasedMongoQuery(namedQuery, queryMethod, operations, EXPRESSION_PARSER,
-                        evaluationContextProvider)
-            } else return if (queryMethod.hasAnnotatedQuery()) {
-                CoroutineStringBasedMongoQuery(queryMethod, operations, EXPRESSION_PARSER, evaluationContextProvider)
-            } else {
-                CoroutinePartTreeMongoQuery(queryMethod, operations)
+            return when {
+                namedQueries.hasQuery(namedQueryName) -> {
+                    val namedQuery = namedQueries.getQuery(namedQueryName)
+                    CoroutineStringBasedMongoQuery(
+                        namedQuery, queryMethod, operations, expressionParser,
+                        evaluationContextProvider
+                    )
+                }
+                queryMethod.hasAnnotatedAggregation() -> {
+                    TODO("Annotated Aggregation")
+                    CoroutineStringBasedMongoQuery(queryMethod, operations, expressionParser, evaluationContextProvider)
+                }
+                queryMethod.hasAnnotatedQuery() -> {
+                    CoroutineStringBasedMongoQuery(queryMethod, operations, expressionParser, evaluationContextProvider)
+                }
+                else -> {
+                    CoroutinePartTreeMongoQuery(queryMethod, operations, expressionParser, evaluationContextProvider)
+                }
             }
         }
     }

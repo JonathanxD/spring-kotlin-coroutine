@@ -22,7 +22,7 @@ import kotlinx.coroutines.reactor.mono
 import reactor.core.publisher.Mono
 
 interface CoroutineWebFilter: WebFilter {
-    override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> = GlobalScope.mono(Dispatchers.Unconfined) {
+    override fun filter(exchange: ServerWebExchange, chain: WebFilterChain): Mono<Void> = mono(Dispatchers.Unconfined) {
         filter(CoroutineServerWebExchange(exchange), CoroutineWebFilterChain(chain))
     } as Mono<Void>
 

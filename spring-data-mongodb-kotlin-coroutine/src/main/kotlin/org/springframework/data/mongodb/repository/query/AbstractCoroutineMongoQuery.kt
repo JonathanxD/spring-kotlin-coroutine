@@ -16,19 +16,30 @@
 
 package org.springframework.data.mongodb.repository.query
 
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.runBlocking
+import org.bson.codecs.configuration.CodecRegistry
 import org.springframework.core.convert.converter.Converter
 import org.springframework.data.convert.EntityInstantiators
-import org.springframework.data.mongodb.core.CoroutineMongoOperations
+import org.springframework.data.mapping.model.SpELExpressionEvaluator
+import org.springframework.data.mongodb.core.*
+import org.springframework.data.mongodb.core.CoroutineDatabaseCallback.Companion.invoke
 import org.springframework.data.mongodb.core.query.Query
 import org.springframework.data.repository.query.ParameterAccessor
+import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider
 import org.springframework.data.repository.query.RepositoryQuery
+import org.springframework.data.spel.ExpressionDependencies
+import org.springframework.expression.ExpressionParser
 import org.springframework.kotlin.coroutine.util.executeSuspend
+import org.springframework.util.Assert
+import reactor.core.publisher.Mono
 import kotlin.coroutines.Continuation
 
 abstract class AbstractCoroutineMongoQuery(
     private val method: CoroutineMongoQueryMethod,
-    private val operations: CoroutineMongoOperations
+    private val operations: CoroutineMongoOperations,
+    private val expressionParser: ExpressionParser,
+    private val evaluationContextProvider: QueryMethodEvaluationContextProvider
 ): RepositoryQuery {
 
     private val instantiators: EntityInstantiators = EntityInstantiators()
@@ -116,6 +127,24 @@ abstract class AbstractCoroutineMongoQuery(
     }
 
     /**
+     * Obtain a the [EvaluationContext] suitable to evaluate expressions backed by the given dependencies.
+     *
+     * @param dependencies must not be null.
+     * @param accessor must not be null.
+     * @return the [SpELExpressionEvaluator].
+     * @since 2.4
+     */
+    protected open fun getSpELExpressionEvaluatorFor(
+        dependencies: ExpressionDependencies?,
+        accessor: ConvertingParameterAccessor
+    ): SpELExpressionEvaluator {
+        return DefaultSpELExpressionEvaluator(
+            expressionParser, evaluationContextProvider
+                .getEvaluationContext<MongoParameters>(queryMethod.parameters, accessor.values, dependencies)
+        )
+    }
+
+    /**
      * Creates a [Query] instance using the given [ParameterAccessor]
      *
      * @param accessor must not be null.
@@ -137,4 +166,14 @@ abstract class AbstractCoroutineMongoQuery(
      * @since 1.5
      */
     protected abstract fun isDeleteQuery(): Boolean
+
+    protected open fun getCodecRegistry(): CodecRegistry {
+        val callback = ReactiveDatabaseCallback {
+            Mono.just(it.codecRegistry)
+        }
+        val coroutineCallBack = invoke(callback)
+        return runBlocking {
+            operations.execute(coroutineCallBack).single()
+        }
+    }
 }

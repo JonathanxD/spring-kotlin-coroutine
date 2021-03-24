@@ -21,6 +21,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Delay
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.InternalCoroutinesApi
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.disposeOnCancellation
 import org.springframework.kotlin.coroutine.context.CoroutineContextResolver
 import org.springframework.scheduling.TaskScheduler
@@ -30,14 +31,16 @@ import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 
 internal open class TaskSchedulerCoroutineContextResolver : CoroutineContextResolver {
+    @InternalCoroutinesApi
     override fun resolveContext(beanName: String, bean: Any?): CoroutineContext? =
             (bean as? TaskScheduler)?.asCoroutineDispatcher()
 }
 
+@InternalCoroutinesApi
 private fun TaskScheduler.asCoroutineDispatcher(): CoroutineContext =
         TaskSchedulerDispatcher(this)
 
-@UseExperimental(InternalCoroutinesApi::class)
+@InternalCoroutinesApi
 internal class TaskSchedulerDispatcher(private val scheduler: TaskScheduler) : CoroutineDispatcher(), Delay {
     override fun dispatch(context: CoroutineContext, block: Runnable) {
         scheduler.schedule(block, Date())
@@ -51,7 +54,7 @@ internal class TaskSchedulerDispatcher(private val scheduler: TaskScheduler) : C
         continuation.disposeOnCancellation(disposable)
     }
 
-    override fun invokeOnTimeout(timeMillis: Long, block: Runnable): DisposableHandle =
+    override fun invokeOnTimeout(timeMillis: Long, block: Runnable, context: CoroutineContext): DisposableHandle =
         scheduler.schedule(block, Date(System.currentTimeMillis() + timeMillis)).asDisposableHandle()
 
     override fun toString(): String = scheduler.toString()

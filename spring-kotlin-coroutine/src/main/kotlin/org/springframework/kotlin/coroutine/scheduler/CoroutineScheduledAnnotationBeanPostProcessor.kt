@@ -16,15 +16,7 @@
 
 package org.springframework.kotlin.coroutine.scheduler
 
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.InternalCoroutinesApi
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.handleCoroutineException
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendAtomicCancellableCoroutine
+import kotlinx.coroutines.*
 import org.springframework.aop.support.AopUtils
 import org.springframework.beans.DirectFieldAccessor
 import org.springframework.context.event.ContextRefreshedEvent
@@ -51,6 +43,7 @@ import kotlin.coroutines.intrinsics.COROUTINE_SUSPENDED
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
+@InternalCoroutinesApi
 open internal class CoroutineScheduledAnnotationBeanPostProcessor(
         private val scheduledDispatcherName: String,
         private val contextResolver: GlobalCoroutineContextResolver,
@@ -168,13 +161,13 @@ open internal class CoroutineScheduledAnnotationBeanPostProcessor(
         }
 
 }
-@UseExperimental(InternalCoroutinesApi::class)
+
 data class ScheduledCoroutine(
         val bean: Any,
         val invocableMethod: Method,
         val policy: SchedulingPolicy
 ) {
-    suspend fun run(): Unit = suspendAtomicCancellableCoroutine { continuation ->
+    suspend fun run(): Unit = suspendCancellableCoroutine { continuation ->
         try {
             invocableMethod.invoke(bean, continuation)
         } catch (e: InvocationTargetException) {

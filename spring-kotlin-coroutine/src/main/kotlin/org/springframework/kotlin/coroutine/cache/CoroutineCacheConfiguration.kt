@@ -91,7 +91,7 @@ private class CoroutineCacheInterceptor: CacheInterceptor() {
     private fun invokeCoroutine(invocation: MethodInvocation): Any? =
             try {
                 val args = invocation.arguments
-                val target = invocation.`this`
+                val target = invocation.`this`!!
                 val method = invocation.method
 
                 val cachingContinuation = CachingContinuation(args.last() as Continuation<Any?>) {

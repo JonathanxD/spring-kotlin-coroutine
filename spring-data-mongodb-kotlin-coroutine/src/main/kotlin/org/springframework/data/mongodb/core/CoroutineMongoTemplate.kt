@@ -21,13 +21,14 @@ import com.mongodb.client.result.DeleteResult
 import com.mongodb.client.result.UpdateResult
 import com.mongodb.coroutines.client.CoroutineMongoCollection
 import com.mongodb.coroutines.client.asCoroutineMongoCollection
-import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.reactive.awaitFirst
 import kotlinx.coroutines.reactive.awaitFirstOrDefault
 import kotlinx.coroutines.reactive.awaitLast
 import kotlinx.coroutines.reactive.awaitSingle
-import kotlinx.coroutines.reactive.openSubscription
+import kotlinx.coroutines.reactive.asFlow
 import org.bson.Document
+import org.reactivestreams.Publisher
 import org.springframework.data.geo.GeoResult
 import org.springframework.data.mongodb.core.aggregation.Aggregation
 import org.springframework.data.mongodb.core.aggregation.TypedAggregation
@@ -55,19 +56,19 @@ open class CoroutineMongoTemplate(
     override suspend fun executeCommand(command: Document, readPreference: ReadPreference): Document? =
             reactiveMongoOperations.executeCommand(command, readPreference).awaitFirstOrDefault(null)
 
-    override suspend fun <T> execute(action: CoroutineDatabaseCallback<T>): List<T> =
+    override suspend fun <T: Any> execute(action: CoroutineDatabaseCallback<T>): List<T> =
             reactiveMongoOperations.execute(action.reactiveDatabaseCallback).collectList().awaitSingle()
 
-    override suspend fun <T> execute(entityClass: Class<*>, action: CoroutineCollectionCallback<T>): List<T> =
+    override suspend fun <T: Any> execute(entityClass: Class<*>, action: CoroutineCollectionCallback<T>): List<T> =
             reactiveMongoOperations.execute(entityClass, action.reactiveCollectionCallback).collectList().awaitSingle()
 
-    override suspend fun <T> execute(collectionName: String, action: CoroutineCollectionCallback<T>): List<T> =
+    override suspend fun <T: Any> execute(collectionName: String, action: CoroutineCollectionCallback<T>): List<T> =
             reactiveMongoOperations.execute(collectionName, action.reactiveCollectionCallback).collectList().awaitSingle()
 
-    override suspend fun <T> createCollection(entityClass: Class<T>): CoroutineMongoCollection<Document> =
+    override suspend fun <T: Any> createCollection(entityClass: Class<T>): CoroutineMongoCollection<Document> =
             reactiveMongoOperations.createCollection(entityClass).awaitFirstOrDefault(null).asCoroutineMongoCollection()
 
-    override suspend fun <T> createCollection(entityClass: Class<T>, collectionOptions: CollectionOptions): CoroutineMongoCollection<Document> =
+    override suspend fun <T: Any> createCollection(entityClass: Class<T>, collectionOptions: CollectionOptions): CoroutineMongoCollection<Document> =
             reactiveMongoOperations.createCollection(entityClass, collectionOptions).awaitFirstOrDefault(null).asCoroutineMongoCollection()
 
     override suspend fun createCollection(collectionName: String): CoroutineMongoCollection<Document> =
@@ -79,16 +80,16 @@ open class CoroutineMongoTemplate(
     override suspend fun getCollectionNames(): List<String> =
             reactiveMongoOperations.collectionNames.collectList().awaitSingle()
 
-    override fun getCollection(collectionName: String): CoroutineMongoCollection<Document> =
-            reactiveMongoOperations.getCollection(collectionName).asCoroutineMongoCollection()
+    override suspend fun getCollection(collectionName: String): CoroutineMongoCollection<Document> =
+            reactiveMongoOperations.getCollection(collectionName).awaitFirstOrDefault(null).asCoroutineMongoCollection()
 
-    override suspend fun <T> collectionExists(entityClass: Class<T>): Boolean =
+    override suspend fun <T: Any> collectionExists(entityClass: Class<T>): Boolean =
             reactiveMongoOperations.collectionExists(entityClass).awaitFirst()
 
     override suspend fun collectionExists(collectionName: String): Boolean =
             reactiveMongoOperations.collectionExists(collectionName).awaitFirst()
 
-    override suspend fun <T> dropCollection(entityClass: Class<T>) {
+    override suspend fun <T: Any> dropCollection(entityClass: Class<T>) {
         reactiveMongoOperations.dropCollection(entityClass).awaitLast()
     }
 
@@ -96,16 +97,16 @@ open class CoroutineMongoTemplate(
         reactiveMongoOperations.dropCollection(collectionName).awaitLast()
     }
 
-    override suspend fun <T> findAll(entityClass: Class<T>): List<T> =
+    override suspend fun <T: Any> findAll(entityClass: Class<T>): List<T> =
             reactiveMongoOperations.findAll(entityClass).collectList().awaitSingle()
 
-    override suspend fun <T> findAll(entityClass: Class<T>, collectionName: String): List<T> =
+    override suspend fun <T: Any> findAll(entityClass: Class<T>, collectionName: String): List<T> =
             reactiveMongoOperations.findAll(entityClass, collectionName).collectList().awaitSingle()
 
-    override suspend fun <T> findOne(query: Query, entityClass: Class<T>): T? =
+    override suspend fun <T: Any> findOne(query: Query, entityClass: Class<T>): T? =
             reactiveMongoOperations.findOne(query, entityClass).awaitFirstOrDefault(null)
 
-    override suspend fun <T> findOne(query: Query, entityClass: Class<T>, collectionName: String): T? =
+    override suspend fun <T: Any> findOne(query: Query, entityClass: Class<T>, collectionName: String): T? =
             reactiveMongoOperations.findOne(query, entityClass, collectionName).awaitFirstOrDefault(null)
 
     override suspend fun exists(query: Query, collectionName: String): Boolean =
@@ -275,9 +276,9 @@ open class CoroutineMongoTemplate(
     override val converter: MongoConverter
         get() = reactiveMongoOperations.converter
 
-    override fun <T> tail(query: Query, entityClass: Class<T>): ReceiveChannel<T> =
-            reactiveMongoOperations.tail(query, entityClass).openSubscription()
+    override fun <T: Any> tail(query: Query, entityClass: Class<T>): Flow<T> =
+        reactiveMongoOperations.tail(query, entityClass).asFlow()
 
-    override fun <T> tail(query: Query, entityClass: Class<T>, collectionName: String): ReceiveChannel<T> =
-            reactiveMongoOperations.tail(query, entityClass, collectionName).openSubscription()
+    override fun <T: Any> tail(query: Query, entityClass: Class<T>, collectionName: String): Flow<T> =
+            reactiveMongoOperations.tail(query, entityClass, collectionName).asFlow()
 }

@@ -18,20 +18,22 @@ package org.springframework.data.mongodb.core
 
 import com.mongodb.reactivestreams.client.MongoDatabase
 import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.reactive.openSubscription
 
-interface CoroutineDatabaseCallback<T> {
+interface CoroutineDatabaseCallback<T: Any> {
     val reactiveDatabaseCallback: ReactiveDatabaseCallback<T>
 
-    fun doInDB(db: MongoDatabase): ReceiveChannel<T>
+    fun doInDB(db: MongoDatabase): Flow<T>
 
     companion object {
-        operator fun <T> invoke(callback:  ReactiveDatabaseCallback<T>): CoroutineDatabaseCallback<T> = object: CoroutineDatabaseCallback<T> {
+        operator fun <T: Any> invoke(callback:  ReactiveDatabaseCallback<T>): CoroutineDatabaseCallback<T> = object: CoroutineDatabaseCallback<T> {
             override val reactiveDatabaseCallback: ReactiveDatabaseCallback<T>
                 get() = callback
 
-            override fun doInDB(db: MongoDatabase): ReceiveChannel<T> =
-                callback.doInDB(db).openSubscription()
+            override fun doInDB(db: MongoDatabase): Flow<T> =
+                callback.doInDB(db).asFlow()
         }
     }
 }

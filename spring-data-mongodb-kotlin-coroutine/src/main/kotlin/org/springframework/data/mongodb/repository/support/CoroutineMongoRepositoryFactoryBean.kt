@@ -69,7 +69,7 @@ open class CoroutineMongoRepositoryFactoryBean<T: Repository<S, ID>, S, ID: Seri
      override fun createRepositoryFactory(): RepositoryFactorySupport =
         getFactoryInstance(operations).apply {
             if (createIndexesForQueryMethods) {
-                addQueryCreationListener(IndexEnsuringQueryCreationListener { collectionName -> operations.indexOps(collectionName).blocking() })
+                addQueryCreationListener(IndexEnsuringQueryCreationListener { collectionName, type -> operations.indexOps(collectionName).blocking() })
             }
         }
 

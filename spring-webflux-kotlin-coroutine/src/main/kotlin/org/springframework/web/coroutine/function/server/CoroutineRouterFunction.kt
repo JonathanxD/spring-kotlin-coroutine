@@ -81,7 +81,7 @@ class CoroutineRouterFunctionDsl {
     }
 
     private fun <T: CoroutineServerResponse> CoroutineHandlerFunction<T>.asHandlerFunction() = HandlerFunction {
-        GlobalScope.mono(Dispatchers.Unconfined) {
+        mono(Dispatchers.Unconfined) {
             this@asHandlerFunction.invoke(org.springframework.web.coroutine.function.server.CoroutineServerRequest(it))?.extractServerResponse()
         }
     }

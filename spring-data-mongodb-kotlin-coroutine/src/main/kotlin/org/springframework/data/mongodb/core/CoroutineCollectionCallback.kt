@@ -19,7 +19,7 @@ package org.springframework.data.mongodb.core
 import com.mongodb.coroutines.client.CoroutineMongoCollection
 import org.bson.Document
 
-interface CoroutineCollectionCallback<T> {
+interface CoroutineCollectionCallback<T: Any> {
     val reactiveCollectionCallback: ReactiveCollectionCallback<T>
 
     suspend fun doInCollection(collection: CoroutineMongoCollection<Document>): List<T>

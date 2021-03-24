@@ -16,6 +16,7 @@
 
 package org.springframework.kotlin.coroutine.scheduler
 
+import kotlinx.coroutines.InternalCoroutinesApi
 import org.springframework.beans.factory.config.BeanDefinition
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory
 import org.springframework.beans.factory.support.BeanDefinitionRegistry
@@ -32,6 +33,7 @@ import org.springframework.kotlin.coroutine.context.GlobalCoroutineContextResolv
 import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor
 import org.springframework.scheduling.config.TaskManagementConfigUtils
 
+@OptIn(InternalCoroutinesApi::class)
 @Configuration
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
 @Import(CoroutineSchedulerSupportingConfiguration::class)
@@ -40,7 +42,7 @@ internal open class CoroutineSchedulerConfiguration: ImportAware {
 
     override fun setImportMetadata(importMetadata: AnnotationMetadata) {
         schedulerDispatcher = AnnotationAttributes.fromMap(
-                importMetadata.getAnnotationAttributes(EnableCoroutine::class.java.name, false))["schedulerDispatcher"].toString()
+                importMetadata.getAnnotationAttributes(EnableCoroutine::class.java.name, false))!!["schedulerDispatcher"].toString()
     }
 
     @Bean(COROUTINE_SCHEDULED_ANNOTATION_PROCESSOR_BEAN_NAME)

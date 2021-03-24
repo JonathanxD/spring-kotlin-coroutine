@@ -24,8 +24,6 @@ import org.springframework.context.annotation.Role
 import org.springframework.core.annotation.AnnotationAttributes
 import org.springframework.core.type.AnnotationMetadata
 import org.springframework.kotlin.coroutine.EnableCoroutine
-import io.reactivex.Scheduler as Rx2Scheduler
-import reactor.core.scheduler.Scheduler as ReactorScheduler
 
 @Configuration
 @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
@@ -34,7 +32,7 @@ internal open class ProxyCoroutineConfiguration : ImportAware {
 
     override fun setImportMetadata(importMetadata: AnnotationMetadata) {
         enableCoroutines = AnnotationAttributes.fromMap(
-                importMetadata.getAnnotationAttributes(EnableCoroutine::class.java.name, false))
+                importMetadata.getAnnotationAttributes(EnableCoroutine::class.java.name, false))!!
     }
 
     @Bean

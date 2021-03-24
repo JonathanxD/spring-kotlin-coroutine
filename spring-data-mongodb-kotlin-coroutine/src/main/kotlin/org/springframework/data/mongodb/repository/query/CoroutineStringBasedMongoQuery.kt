@@ -16,52 +16,76 @@
 
 package org.springframework.data.mongodb.repository.query
 
+import kotlinx.coroutines.runBlocking
+import org.bson.Document
 import org.slf4j.LoggerFactory
+import org.springframework.data.mapping.model.SpELExpressionEvaluator
 import org.springframework.data.mongodb.core.CoroutineMongoOperations
+import org.springframework.data.mongodb.core.ReactiveDatabaseCallback
 import org.springframework.data.mongodb.core.query.BasicQuery
 import org.springframework.data.mongodb.core.query.Query
-import org.springframework.data.repository.query.EvaluationContextProvider
+import org.springframework.data.mongodb.util.json.ParameterBindingContext
+import org.springframework.data.mongodb.util.json.ParameterBindingDocumentCodec
+import org.springframework.data.mongodb.util.json.ValueProvider
+import org.springframework.data.repository.query.QueryMethodEvaluationContextProvider
+import org.springframework.data.spel.ExpressionDependencies
+import org.springframework.expression.ExpressionParser
 import org.springframework.expression.spel.standard.SpelExpressionParser
+import org.springframework.util.Assert
+import reactor.core.publisher.Mono
 import java.util.ArrayList
 
 open class CoroutineStringBasedMongoQuery(
-        query: String, method: CoroutineMongoQueryMethod, operations: CoroutineMongoOperations,
-        expressionParser: SpelExpressionParser, evaluationContextProvider: EvaluationContextProvider
-): AbstractCoroutineMongoQuery(method, operations) {
+        query: String,
+        method: CoroutineMongoQueryMethod,
+        operations: CoroutineMongoOperations,
+        expressionParser: ExpressionParser,
+        evaluationContextProvider: QueryMethodEvaluationContextProvider
+): AbstractCoroutineMongoQuery(method, operations, expressionParser, evaluationContextProvider) {
 
-    private val COUND_AND_DELETE = "Manually defined query for %s cannot be both a count and delete query at the same time!"
+    /*
+    String query, MongoQueryMethod method, MongoOperations mongoOperations,
+			ExpressionParser expressionParser, QueryMethodEvaluationContextProvider evaluationContextProvider
+     */
+
+    private val COUNT_EXISTS_AND_DELETE = "Manually defined query for %s cannot be a count and exists or delete query at the same time!"
     private val LOG = LoggerFactory.getLogger(CoroutineStringBasedMongoQuery::class.java)
-    private val BINDING_PARSER = StringBasedMongoQuery.ParameterBindingParser.INSTANCE
 
     private val query: String
     private val fieldSpec: String?
     private val isCountQuery: Boolean
     private val isDeleteQuery: Boolean
-    private val queryParameterBindings: List<StringBasedMongoQuery.ParameterBinding>
-    private val fieldSpecParameterBindings: List<StringBasedMongoQuery.ParameterBinding>
-    private val parameterBinder: ExpressionEvaluatingParameterBinder
+    private val isExistsQuery: Boolean
+    private val expressionParser: ExpressionParser
+    private val evaluationContextProvider: QueryMethodEvaluationContextProvider
 
-    constructor(method: CoroutineMongoQueryMethod, operations: CoroutineMongoOperations,
-                expressionParser: SpelExpressionParser, evaluationContextProvider: EvaluationContextProvider):
-            this(method.annotatedQuery, method, operations, expressionParser, evaluationContextProvider)
+    constructor(method: CoroutineMongoQueryMethod, mongoOperations: CoroutineMongoOperations,
+                expressionParser: ExpressionParser, evaluationContextProvider: QueryMethodEvaluationContextProvider):
+            this(method.annotatedQuery!!, method, mongoOperations, expressionParser, evaluationContextProvider)
 
     init {
-        this.queryParameterBindings = ArrayList()
-        this.query = BINDING_PARSER.parseAndCollectParameterBindingsFromQueryIntoBindings(query,
-                this.queryParameterBindings)
+        Assert.notNull(query, "Query must not be null!")
+        Assert.notNull(expressionParser, "SpelExpressionParser must not be null!")
 
-        this.fieldSpecParameterBindings = ArrayList()
-        this.fieldSpec = BINDING_PARSER.parseAndCollectParameterBindingsFromQueryIntoBindings(
-                method.fieldSpecification, this.fieldSpecParameterBindings)
+        this.query = query
+        this.expressionParser = expressionParser
+        this.evaluationContextProvider = evaluationContextProvider
+        fieldSpec = method.fieldSpecification
 
-        this.isCountQuery = method.hasAnnotatedQuery() && method.queryAnnotation.count
-        this.isDeleteQuery = method.hasAnnotatedQuery() && method.queryAnnotation.delete
+        if (method.hasAnnotatedQuery()) {
+            val queryAnnotation = method.queryAnnotation!!
+            this.isCountQuery = queryAnnotation.count
+            this.isExistsQuery = queryAnnotation.exists
+            this.isDeleteQuery = queryAnnotation.delete
 
-        if (isCountQuery && isDeleteQuery) {
-            throw IllegalArgumentException(String.format(COUND_AND_DELETE, method))
+            require(
+                !(BooleanUtil.countBooleanTrueValues(isCountQuery, isExistsQuery, isDeleteQuery) > 1)
+            ) { String.format(COUNT_EXISTS_AND_DELETE, method) }
+        } else {
+            isCountQuery = false
+            isExistsQuery = false
+            isDeleteQuery = false
         }
-
-        this.parameterBinder = ExpressionEvaluatingParameterBinder(expressionParser, evaluationContextProvider)
     }
 
     /*
@@ -70,16 +94,44 @@ open class CoroutineStringBasedMongoQuery(
 	 */
     override fun createQuery(accessor: ConvertingParameterAccessor): Query {
 
-        val queryString = parameterBinder.bind(this.query, accessor,
-                ExpressionEvaluatingParameterBinder.BindingContext(queryMethod.parameters, queryParameterBindings))
-        val fieldsString = parameterBinder.bind(this.fieldSpec, accessor,
-                ExpressionEvaluatingParameterBinder.BindingContext(queryMethod.parameters, fieldSpecParameterBindings))
+        val codec: ParameterBindingDocumentCodec = getParameterBindingCodec()
 
-        return BasicQuery(queryString, fieldsString).with(accessor.sort).apply {
-            if (LOG.isDebugEnabled) {
-                LOG.debug(String.format("Created query %s for %s fields.", queryObject, fieldsObject))
-            }
+        val queryObject = codec.decode(query, getBindingContext(query, accessor, codec))
+        val fieldsObject = codec.decode(fieldSpec, getBindingContext(fieldSpec!!, accessor, codec))
+
+        val query = BasicQuery(queryObject, fieldsObject).with(accessor.sort)
+
+        if (LOG.isDebugEnabled) {
+            LOG.debug(
+                String.format(
+                    "Created query %s for %s fields.",
+                    query.queryObject,
+                    query.fieldsObject
+                )
+            )
         }
+
+        return query
+    }
+
+    private fun getBindingContext(
+        json: String, accessor: ConvertingParameterAccessor,
+        codec: ParameterBindingDocumentCodec
+    ): ParameterBindingContext {
+        val dependencies = codec.captureExpressionDependencies(
+            json, { index: Int ->
+                accessor.getBindableValue(
+                    index
+                )
+            },
+            expressionParser
+        )
+        val evaluator: SpELExpressionEvaluator = getSpELExpressionEvaluatorFor(dependencies, accessor)
+        return ParameterBindingContext({ index: Int -> accessor.getBindableValue(index) }, evaluator)
+    }
+
+    private fun getParameterBindingCodec(): ParameterBindingDocumentCodec {
+        return ParameterBindingDocumentCodec(getCodecRegistry())
     }
 
     /*
