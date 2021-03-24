@@ -166,6 +166,7 @@ project(":spring-kotlin-coroutine") {
     }
 }
 
+/*
 project(":spring-webmvc-kotlin-coroutine") {
     apply plugin: 'pl.allegro.tech.build.axion-release'
     apply plugin: 'com.jfrog.bintray'
@@ -267,7 +268,7 @@ project(":spring-webmvc-kotlin-coroutine") {
         }
     }
 }
-
+*/
 project(":spring-webflux-kotlin-coroutine") {
     apply plugin: 'pl.allegro.tech.build.axion-release'
     apply plugin: 'com.jfrog.bintray'
@@ -597,6 +598,7 @@ project("spring-kotlin-coroutine-test") {
     }
 }
 
+/*
 project(":spring-kotlin-coroutine-demo") {
     apply plugin: "org.springframework.boot"
 
@@ -615,3 +617,4 @@ project(":spring-kotlin-coroutine-demo") {
     }
 }
 
+*/
