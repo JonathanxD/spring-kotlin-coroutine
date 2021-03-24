@@ -124,7 +124,6 @@ open class CoroutineMongoRepositoryFactory(
                 }
                 queryMethod.hasAnnotatedAggregation() -> {
                     TODO("Annotated Aggregation")
-                    CoroutineStringBasedMongoQuery(queryMethod, operations, expressionParser, evaluationContextProvider)
                 }
                 queryMethod.hasAnnotatedQuery() -> {
                     CoroutineStringBasedMongoQuery(queryMethod, operations, expressionParser, evaluationContextProvider)
